@@ -1,0 +1,130 @@
+##this file is linked to the Jenkins-GitHub-Container-image file
+
+pipeline{
+
+    agent any
+
+    options {
+        timestamps()
+        timeout(time:20, unit:'MINUTES')
+
+        office365ConnectorWebhooks([[
+            name: 'eTranzact MSTeams',
+            startNotification: true,
+            notifySuccess: true,
+            notifyAborted: true,
+            notifyFailure: true,
+            url: "${Build_Alerts_WebHook_URL}"
+        ]])
+    }
+
+    environment {
+        RELEASE_TAG = "release"
+        DEV_BUILD_TAG = "dev"
+        REPOSITORY_NAME = "gh-database-service"
+        DEPLOYMENT_MANIFEST_NAME = "application-gh-database-service.yaml"
+        SERVICE_NAME = "database-service"
+    }
+
+
+    stages{
+
+        // Checkout Code From GitHub
+        // stage("CheckOut"){
+        //     steps{
+        //         script{
+        //             checkout scm
+        //         }
+        //     }
+        // }
+
+   //     // Run Static Code Analysis
+        stage('Code Quality Checks') {
+            steps {
+                withSonarQubeEnv(credentialsId: "${SonarQube_Credentials_ID}", installationName: "eTranzact GH Sonarqube Server") {
+                    sh 'mvn clean verify -DskipTests=true sonar:sonar'
+                }
+        }
+
+    }
+
+
+        // Build Code Into Deployable Artifact
+        stage("Build Artifact & Run Unit Test Cases"){
+            steps{
+                script{
+                    sh"""
+                        mvn clean package -DskipTests=true -Dquarkus.package.type=uber-jar
+                    """
+                }
+            }
+        }
+
+
+        // Package Deployable Artifact & Publish To ECR Storage Repository
+        stage ('Package & Publish') {
+            when{
+                anyOf {
+                    branch 'develop'
+                    expression {
+                        return env.BRANCH_NAME.startsWith('release/')
+                    }
+                }
+            }
+            steps{
+
+                script{
+                    sh 'aws ecr get-login-password --region eu-west-1 | docker login --username AWS --password-stdin ${AWS_Account_URL}'
+                    def pom = readMavenPom file: 'pom.xml'
+                    def version = pom.version
+
+                    if (env.BRANCH_NAME == 'develop') {
+
+                        TAG = "${DEV_BUILD_TAG}-${version}-${env.BUILD_NUMBER}"
+
+                        echo "Building Docker Image For Release ${TAG}"
+                        app = docker.build("$REPOSITORY_NAME:$TAG")
+                    }
+
+                    else {
+
+                        TAG = "${RELEASE_TAG}-${version}-${env.BUILD_NUMBER}"
+
+                        echo "Building Docker Image For Release ${TAG}"
+                        app = docker.build("$REPOSITORY_NAME:$TAG")
+                    }
+
+                    docker.withRegistry("${ECR_Repository_URL}/${REPOSITORY_NAME}") {
+                    app.push("$TAG")
+                    }
+                    env.TAG = "${TAG}"
+                    echo "${TAG}"
+                }
+            }
+        }
+
+
+        Deploy To SandBox Environment [If Branch == Develop]
+        stage ('Deploy To SandBox Environment') {
+            when{
+                anyOf {
+                    branch 'develop'
+                    expression {
+                        return env.BRANCH_NAME.startsWith('release/')
+                    }
+                }
+            }
+            steps {
+
+                script {
+                    echo "Triggering SandBox Environment Deployment Script"
+                    // BUILD_TRIGGERED_BY = currentBuild.getBuildCauses()[0].userId
+                    // echo "BUILD_TRIGGERED_BY: ${BUILD_TRIGGERED_BY}"
+                    echo "${TAG}"
+                    build job: 'gh-argocd-sandbox-deployment-job', parameters: [string(name: 'IMAGETAG', value: "${TAG}"), string(name: 'DEPLOYMENT_MANIFEST_NAME', value: "${DEPLOYMENT_MANIFEST_NAME}"), string(name: 'REPOSITORY_NAME', value: "${REPOSITORY_NAME}"), string(name: 'ENVIRONMENT', value: 'sandbox')]
+                }
+            }
+        }
+    }
+
+}
