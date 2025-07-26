@@ -1,0 +1,171 @@
+pipeline {
+    agent any
+    tools { nodejs "NodeJS_22.3.0" }
+
+    options {
+        timestamps()
+        timeout(time: 40, unit: 'MINUTES')
+    }
+
+    parameters {
+        string(name: 'BRANCH', defaultValue: '', description: 'Git branch to build from')
+    }
+
+    stages {
+        stage("Extract Repository Name") {
+            steps {
+                script {
+                    // Extract the repository name from GIT_URL
+                    def gitUrl = env.GIT_URL ?: ''
+                    if (gitUrl) {
+                        def repoName = gitUrl.split('/').last().replace('.git', '')
+                        env.REPOSITORY_NAME = repoName
+                        env.REPOSITORY_URL = gitUrl
+                        echo "Extracted Repository Name: ${env.REPOSITORY_NAME}"
+                        echo "Extracted Repository URL: ${env.REPOSITORY_URL}"
+                    } else {
+                        error "GIT_URL is not available. Make sure the job is connected to a Git repository."
+                    }
+                }
+            }
+        }
+
+        stage("Cleanup Workspace") {
+            steps {
+                cleanWs()
+            }
+        }
+
+        stage("Checkout Code") {
+            steps {
+                script {
+                    echo "Pipeline parameters (BRANCH): ${params.BRANCH}"
+                    echo "Multibranch environment branch (BRANCH_NAME): ${env.BRANCH_NAME}"
+
+                    def branchToBuild = params.BRANCH?.trim() ? params.BRANCH.trim() : (env.BRANCH_NAME?.trim() ?: 'develop')
+                    echo "Checking out branch: ${branchToBuild}"
+                    echo "Determined branch to build: ${branchToBuild}"
+
+                    try {
+                        checkout([
+                            $class: 'GitSCM',
+                            branches: [[name: "*/${branchToBuild}"]],
+                            extensions: [[
+                                $class: 'LocalBranch',
+                                localBranch: "${branchToBuild}"
+                            ]],
+                            submoduleCfg: [],
+                            userRemoteConfigs: [[
+                                url: "${env.REPOSITORY_URL}",
+                                credentialsId: 'ba539f24-9abf-4d03-81cc-4f6ade84e1c5'
+                            ]]
+                        ])
+                    } catch (e) {
+                        error "Failed to checkout branch ${params.BRANCH}: ${e.getMessage()}"
+                    }
+                }
+            }
+        }
+
+        stage("Install Dependencies.") {
+            steps {
+                script {
+                    sh "npm install --legacy-peer-deps"
+                }
+            }
+        }
+
+        stage("Run Unit Tests") {
+            steps {
+                script {
+                    sh "npm run test"
+                }
+            }
+        }
+
+        stage("Get Docker Info") {
+            steps {
+                script {
+                    sh "docker info || echo 'Docker is not configured correctly'"
+                }
+            }
+        }
+
+        stage("Authenticate with GCR") {
+            steps {
+                withCredentials([file(credentialsId: 'access-key-jenkins-gcr', variable: 'SERVICE_ACCOUNT_KEY')]) {
+                    script {
+                        // Use the service account key to authenticate
+                        sh "gcloud auth activate-service-account --key-file=${SERVICE_ACCOUNT_KEY}"
+                        sh "gcloud auth configure-docker"
+                    }
+                }
+            }
+        }
+
+        stage("Build and Push Docker Image") {
+            steps {
+                script {
+                    def jsonContent = readFile 'package.json'
+                    def packageJSON = new groovy.json.JsonSlurperClassic().parseText(jsonContent) // Use JsonSlurperClassic for compatibility
+
+                    def branchToBuild = params.BRANCH?.trim() ? params.BRANCH.trim() : (env.BRANCH_NAME?.trim() ?: 'develop')
+
+                    def packageVersion = packageJSON.version
+                    def appTag = "${branchToBuild.replace('/', '_')}-${packageVersion}-${env.BUILD_NUMBER}"
+
+                    echo "Building Docker image with tag: ${appTag}"
+
+                    def app = docker.build("${GCR_URL}/${REPOSITORY_NAME}:${appTag}")
+                    sh "gcloud auth configure-docker"
+                    app.push("${appTag}")
+
+                    echo "Docker image pushed: ${GCR_URL}/${REPOSITORY_NAME}:${appTag}"
+                }
+            }
+        }
+
+        stage("Approval Step") {
+            steps {
+                script {
+                    // Prompt the user for approval
+                    userDecision = input message: 'Do you want to deploy the application?',
+                    parameters: [
+                        choice(choices: ['Approve', 'Reject'], description: 'Select your action', name: 'ACTION')
+                    ]
+                    echo "User selected: ${userDecision}"
+                }
+            }
+        }
+
+        stage("Deployment") {
+            when {
+                expression { userDecision == 'Approve' }
+            }
+            steps {
+                echo "Deploying the application..."
+            }
+        }
+
+        stage("Post-Rejection Cleanup") {
+            when {
+                expression { userDecision == 'Reject' }
+            }
+            steps {
+                echo "Performing cleanup after rejection..."
+            }
+        }
+    }
+
+    post {
+        always {
+            cleanWs()
+        }
+        success {
+            echo "Pipeline executed successfully."
+        }
+        failure {
+            echo "Pipeline execution failed."
+        }
+    }
+}
