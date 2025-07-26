@@ -5,12 +5,10 @@
 
 node {
 
-
     stage('Checkout Repository') {
         checkout scm: scmGit(branches: [[name: '*/master']], extensions: [], userRemoteConfigs: [[credentialsId: 'bf5de993-b44a-4c70-acf9-bc05ded62180', url: 'https://github.com/etranzact-gh/iac_main_kubernetes_argocd_project.git']])
 
     }
-
 
     stage('Update Configfile') { // 
             script {
@@ -36,7 +34,6 @@ node {
             """
             }
       }
-
 
     }
     
