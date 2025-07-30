@@ -1,4 +1,3 @@
-##this file is linked to the Jenkins-GitHub-Container-image file
 
 pipeline{
 
@@ -21,36 +20,65 @@ pipeline{
     environment {
         RELEASE_TAG = "release"
         DEV_BUILD_TAG = "dev"
-        REPOSITORY_NAME = "gh-database-service"
-        DEPLOYMENT_MANIFEST_NAME = "application-gh-database-service.yaml"
-        SERVICE_NAME = "database-service"
+        DEPLOYMENT_MANIFEST_NAME = "nugs.yaml" 
+        SERVICE_NAME = "nugs"
     }
 
 
     stages{
 
         // Checkout Code From GitHub
-        // stage("CheckOut"){
-        //     steps{
-        //         script{
-        //             checkout scm
+        stage("SourceCode CheckOut"){
+            steps{
+                script{
+                    checkout scm
+                }
+            }
+        }
+
+
+        // Compile Source Code
+        stage('Compile Source Code') {
+            steps {
+                    sh 'mvn compile'
+                }
+        }
+
+        // Test Source Code
+        // stage('Run Unit Test Cases') {
+        //     steps {
+        //             sh 'mvn test'
         //         }
-        //     }
         // }
+
 
    //     // Run Static Code Analysis
         stage('Code Quality Checks') {
             steps {
-                withSonarQubeEnv(credentialsId: "${SonarQube_Credentials_ID}", installationName: "eTranzact GH Sonarqube Server") {
-                    sh 'mvn clean verify -DskipTests=true sonar:sonar'
+                script {
+                    def scannerHome = tool 'sonarscaner';
+                    def REPOSITORY_NAME = "${env.GIT_URL.split('/').last().replace('.git', '').toLowerCase()}"
+                    withSonarQubeEnv('eTranzact GH Sonarqube Server') {
+                        sh "${scannerHome}/bin/sonar-scanner -Dsonar.projectKey=${REPOSITORY_NAME} -Dsonar.projectName=${REPOSITORY_NAME} -Dsonar.java.binaries=."
+                    }
                 }
         }
 
     }
 
+   //     // Quality Gates Inspection
+        // stage('Quality Gates Inspection') {
+        //     steps {
+        //         script{
+        //             waitForQualityGate abortPipeline: true, credentialsId: 'Jenkins-Sonarqube-CICD-Secret-Access-Token'
+        //         }
+        //     }
+
+        // }
+
 
         // Build Code Into Deployable Artifact
-        stage("Build Artifact & Run Unit Test Cases"){
+        stage("Build Artifact"){
             steps{
                 script{
                     sh"""
@@ -62,7 +90,7 @@ pipeline{
 
 
         // Package Deployable Artifact & Publish To ECR Storage Repository
-        stage ('Package & Publish') {
+        stage ('Build Docker Image & Push To ECR') {
             when{
                 anyOf {
                     branch 'develop'
@@ -71,40 +99,62 @@ pipeline{
                     }
                 }
             }
-            steps{
+steps {
+    script {
+        // Login to ECR
+        def REPOSITORY_NAME = "${env.GIT_URL.split('/').last().replace('.git', '').toLowerCase()}"
+        sh 'aws ecr get-login-password --region eu-west-1 | docker login --username AWS --password-stdin ${AWS_Account_URL}'
+        // Automatically get GitHub repo name
+        echo "Using repository name: ${REPOSITORY_NAME}"
 
-                script{
-                    sh 'aws ecr get-login-password --region eu-west-1 | docker login --username AWS --password-stdin ${AWS_Account_URL}'
-                    def pom = readMavenPom file: 'pom.xml'
-                    def version = pom.version
 
-                    if (env.BRANCH_NAME == 'develop') {
 
-                        TAG = "${DEV_BUILD_TAG}-${version}-${env.BUILD_NUMBER}"
+        // Check if ECR repository exists, create if not
+        def repoExists = false
+        try {
+            def ecrRepoCheck = sh(
+                script: "aws ecr describe-repositories --repository-names ${REPOSITORY_NAME} --region eu-west-1",
+                returnStatus: true
+            )
+            repoExists = (ecrRepoCheck == 0)
+        } catch (Exception e) {
+            echo "Error checking ECR repository: ${e.getMessage()}"
+            repoExists = false
+        }
 
-                        echo "Building Docker Image For Release ${TAG}"
-                        app = docker.build("$REPOSITORY_NAME:$TAG")
-                    }
+        if (!repoExists) {
+            echo "ECR repository ${REPOSITORY_NAME} not found - creating it"
+            sh "aws ecr create-repository --repository-name ${REPOSITORY_NAME} --region eu-west-1"
+        }
 
-                    else {
+        // Read version from pom.xml
+        def pom = readMavenPom file: 'pom.xml'
+        def version = pom.version
 
-                        TAG = "${RELEASE_TAG}-${version}-${env.BUILD_NUMBER}"
+        // Determine tag based on branch
+        if (env.BRANCH_NAME == 'develop') {
+            TAG = "${DEV_BUILD_TAG}-${version}-${env.BUILD_NUMBER}"
+            echo "Building Docker Image For Development ${TAG}"
+        } else {
+            TAG = "${RELEASE_TAG}-${version}-${env.BUILD_NUMBER}"
+            echo "Building Docker Image For Release ${TAG}"
+        }
 
-                        echo "Building Docker Image For Release ${TAG}"
-                        app = docker.build("$REPOSITORY_NAME:$TAG")
-                    }
-
-                    docker.withRegistry("${ECR_Repository_URL}/${REPOSITORY_NAME}") {
-                    app.push("$TAG")
-                    }
-                    env.TAG = "${TAG}"
-                    echo "${TAG}"
-                }
-            }
+        // Build and push image
+        app = docker.build("$REPOSITORY_NAME:$TAG")
+        docker.withRegistry("${ECR_Repository_URL}") {
+            app.push("$TAG")
+        }
+        
+        // Set environment variable and output
+        env.TAG = "${TAG}"
+        echo "Successfully built and pushed image with tag: ${TAG}"
+    }
+}
         }
 
 
-        Deploy To SandBox Environment [If Branch == Develop]
+        // Deploy To SandBox Environment [If Branch == Develop]
         stage ('Deploy To SandBox Environment') {
             when{
                 anyOf {
@@ -121,7 +171,7 @@ pipeline{
                     // BUILD_TRIGGERED_BY = currentBuild.getBuildCauses()[0].userId
                     // echo "BUILD_TRIGGERED_BY: ${BUILD_TRIGGERED_BY}"
                     echo "${TAG}"
-                    build job: 'gh-argocd-sandbox-deployment-job', parameters: [string(name: 'IMAGETAG', value: "${TAG}"), string(name: 'DEPLOYMENT_MANIFEST_NAME', value: "${DEPLOYMENT_MANIFEST_NAME}"), string(name: 'REPOSITORY_NAME', value: "${REPOSITORY_NAME}"), string(name: 'ENVIRONMENT', value: 'sandbox')]
+                    build job: 'gh-argocd-etz-k8s-deployment-job', parameters: [string(name: 'IMAGETAG', value: "${TAG}"), string(name: 'DEPLOYMENT_MANIFEST_NAME', value: "${DEPLOYMENT_MANIFEST_NAME}"), string(name: 'REPOSITORY_NAME', value: "${REPOSITORY_NAME}"), string(name: 'SERVICE_NAME', value: "${SERVICE_NAME}"), string(name: 'ENVIRONMENT', value: 'sandbox')]
                 }
             }
         }
