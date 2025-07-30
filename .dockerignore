@@ -1,0 +1,95 @@
+# === Maven / Gradle build artifacts ===
+target/
+build/
+.gradle/
+!build/libs/*.jar
+!target/*.jar
+
+# === Dependency caches ===
+.mvn/
+.mvnw
+mvnw.cmd
+.gradle/
+gradle/
+gradlew
+gradlew.bat
+
+# === IDE/editor settings ===
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+*.sw?
+*.sublime*
+
+# === OS generated files ===
+.DS_Store
+Thumbs.db
+ehthumbs.db
+*.bak
+*.tmp
+*.log
+*.swp
+*.lock
+
+# === Git and version control ===
+.git/
+.gitignore
+.gitattributes
+*.patch
+
+# === Test reports, coverage, logs ===
+test-output/
+coverage/
+jacoco.exec
+build/test-results/
+build/reports/
+*.log
+
+# === Docker & CI/CD artifacts ===
+Dockerfile.*
+docker-compose.*
+.dockerignore
+.env
+*.env
+*.yml
+*.yaml
+
+# === Application configs (optional) ===
+# Comment out if you need these
+*.properties
+*.yml
+*.yaml
+
+# === Node/npm frontends (if any) ===
+node_modules/
+npm-debug.log
+yarn.lock
+pnpm-lock.yaml
+package-lock.json
+dist/
+public/
+frontend/node_modules/
+
+# === Snapshots or old files ===
+*.old
+*.orig
+*.rej
+*.bak
+
+# === Java-specific ===
+*.class
+*.jar
+*.war
+*.ear
+
+# === Misc ===
+*.tar
+*.zip
+*.gz
+*.7z
+*.rar
+*.sql
+*.db
+*.sqlite
