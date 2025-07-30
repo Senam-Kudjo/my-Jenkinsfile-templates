@@ -1,0 +1,105 @@
+# === General OS/System files ===
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+*.swp
+*.bak
+*.lock
+
+# === Editor / IDE configs ===
+.vscode/
+.idea/
+*.sublime*
+*.code-workspace
+*.iml
+*.ipr
+*.iws
+
+# === Git ===
+.git/
+.gitignore
+.gitattributes
+
+# === Environment files ===
+.env
+.env.*
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# === Logs and Reports ===
+*.log
+*.gz
+*.zip
+*.7z
+*.rar
+
+# === Dependency directories ===
+node_modules/
+bower_components/
+.pnpm/
+.pnp/
+target/
+build/
+out/
+.gradle/
+.mvn/
+
+# === JS/Frontend Build output ===
+dist/
+build/
+out/
+.next/
+.nuxt/
+.svelte-kit/
+.vite/
+.storybook/
+.temp/
+.tmp/
+coverage/
+.nyc_output/
+test-results/
+
+# === Java/Backend files ===
+*.jar
+*.war
+*.ear
+
+# === Java IDE-specific ===
+*.project
+*.classpath
+*.settings/
+*.factorypath
+.springBeans
+.metadata/
+
+# === Maven / Gradle ===
+.mvn/
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# === VS Code Workspace Storage ===
+.vscode-test/
+
+# === Misc ===
+*.sqlite
+*.db
+*.pid
+*.seed
+*.tgz
+*.bak
+
+# === Platform-specific ===
+.netlify/
+.vercel/
