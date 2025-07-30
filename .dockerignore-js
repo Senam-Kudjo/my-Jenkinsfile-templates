@@ -1,0 +1,65 @@
+# === Node dependencies ===
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-debug.log*
+
+# === Build output ===
+#dist/
+build/
+out/
+public/
+.next/
+.nuxt/
+.svelte-kit/
+.vite/
+.storybook/
+coverage/
+temp/
+tmp/
+
+# === OS / system files ===
+.DS_Store
+Thumbs.db
+*.swp
+*.lock
+*.bak
+*.tmp
+*.log
+
+# === Env and config files ===
+.env
+.env.*
+*.local
+
+# === Git and VCS ===
+.git/
+.gitignore
+.gitattributes
+
+# === Editor / IDE config ===
+.idea/
+.vscode/
+*.sublime*
+*.code-workspace
+
+# === Docker & CI files ===
+docker-compose.*
+Dockerfile
+.dockerignore
+*.yml
+*.yaml
+
+# === Misc binaries and archives ===
+*.tar
+*.zip
+*.gz
+*.rar
+*.7z
+*.bak
+
+# === Others ===
+*.sqlite
+*.db
