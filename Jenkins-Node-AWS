@@ -1,0 +1,190 @@
+
+pipeline{
+
+    agent any
+    tools {nodejs "NodeJS_22.16.0"}
+
+
+    options {
+        timestamps()
+        timeout(time:20, unit:'MINUTES')
+
+        office365ConnectorWebhooks([[
+            name: 'eTranzact MSTeams',
+            startNotification: true,
+            notifySuccess: true,
+            notifyAborted: true,
+            notifyFailure: true,
+            url: "${Build_Alerts_WebHook_URL}"
+        ]])
+    }
+
+
+    environment {
+        RELEASE_TAG = "release"
+        DEV_BUILD_TAG = "dev"
+        DEPLOYMENT_MANIFEST_NAME = "attendance-app-api.yaml"
+        SERVICE_NAME = "attendance-app-api"
+    }
+
+
+    stages{
+        // Checkout Code From GitHub
+        stage("CheckOut"){
+            steps{
+                script{
+                    checkout scm
+                }
+            }
+        }
+
+        // Compile Source Code
+        stage('Compile Source Code') {
+            steps {
+                    sh 'npm install --legacy-peer-deps'
+                  // sh 'npm install --no-audit'
+                }
+        }
+
+        stage('NPM Dependency Auditing') {
+            steps {
+                    sh 'npm audit --audit-level=critical'
+                }
+        }
+
+        // Run Static Code Analysis
+        stage('Code Quality Checks') {
+            steps {
+                script{
+                    def REPOSITORY_NAME = "${env.GIT_URL.split('/').last().replace('.git', '').toLowerCase()}"
+                    def scannerHome = tool 'sonarscaner';
+                    withSonarQubeEnv('eTranzact GH Sonarqube Server') {
+                        sh "${scannerHome}/bin/sonar-scanner -Dsonar.projectKey=${REPOSITORY_NAME} -Dsonar.projectName=${REPOSITORY_NAME}"
+                    }
+                }
+            }
+        }
+
+        // Quality Gates Inspection
+        // stage("Quality Gates Inspection") {
+        //     steps {
+        //         waitForQualityGate abortPipeline: true, credentialsId: 'Jenkins-Sonarqube-CICD-Secret-Access-Token'
+        //     }
+        // }
+
+        // Install & Build Node Modules
+        stage("Build Node Modules"){
+            steps{
+                script{
+                    sh"""
+                        npm run build
+                    """
+                }
+            }
+        }
+
+        // Execute Unit Test Cases
+        // stage("Unit Tests"){
+        //     steps{
+        //         script{
+        //             sh"""
+        //                 npm test
+        //             """
+        //         }
+        //     }
+        // }
+
+
+        // Package Deployable Artifact & Publish To ECR Storage Repository
+        stage("Build Docker Image & Push To ECR"){
+            when{
+                anyOf {
+                    branch 'develop'
+
+                    expression {
+                        return env.BRANCH_NAME.startsWith('release/')
+                    }
+                }
+            }
+steps {
+    script {
+        def REPOSITORY_NAME = "${env.GIT_URL.split('/').last().replace('.git', '').toLowerCase()}"
+        def packageJSON = readJSON file: 'package.json'
+        def packageJSONVersion = packageJSON.version
+        sh 'aws ecr get-login-password --region eu-west-1 | docker login --username AWS --password-stdin ${AWS_Account_URL}'
+
+        // Check if ECR repository exists
+        def repoExists = false
+        try {
+            def ecrRepoCheck = sh(
+                script: "aws ecr describe-repositories --repository-names ${REPOSITORY_NAME} --region eu-west-1",
+                returnStatus: true
+            )
+            repoExists = (ecrRepoCheck == 0)
+        } catch (Exception e) {
+            echo "Error checking ECR repository: ${e.getMessage()}"
+            repoExists = false
+        }
+
+        // Create repository if it doesn't exist
+        if (!repoExists) {
+            echo "ECR repository ${REPOSITORY_NAME} not found - creating it"
+            sh "aws ecr create-repository --repository-name ${REPOSITORY_NAME} --region eu-west-1"
+        }
+
+        // Normal build flow continues regardless
+        if (env.BRANCH_NAME == 'develop') {
+            APP_TAG = "dev-${packageJSONVersion}-${env.BUILD_NUMBER}"
+            echo "Building Development Image: ${APP_TAG} From ${env.BRANCH_NAME}"
+        } else {
+            APP_TAG = "release-${packageJSONVersion}-${env.BUILD_NUMBER}"
+            echo "Building Release Image: ${APP_TAG} From ${env.BRANCH_NAME}"
+        }
+
+        // Always build and push
+        app = docker.build("$REPOSITORY_NAME:$APP_TAG")
+        docker.withRegistry("${ECR_Repository_URL}") {
+            app.push("$APP_TAG")
+        }
+        echo "Successfully built and pushed image: ${REPOSITORY_NAME}:${APP_TAG}"
+    }
+}
+        }
+
+        // Deploy To SandBox Environment [If Branch == Develop]
+        stage ('Deploy To SandBox Environment') {
+            when {
+                anyOf {
+                    branch 'develop'
+                    expression { return env.BRANCH_NAME.startsWith('release/') }
+                }
+            }
+            steps {
+                script {
+                    def REPOSITORY_NAME = "${env.GIT_URL.split('/').last().replace('.git', '').toLowerCase()}"
+                    echo "Triggering Deployment to SandBox"
+                    echo "${APP_TAG}"
+                    build job: 'gh-argocd-etz-k8s-deployment-job', parameters: [
+                        string(name: 'IMAGETAG', value: "${APP_TAG}"),
+                        string(name: 'DEPLOYMENT_MANIFEST_NAME', value: "${DEPLOYMENT_MANIFEST_NAME}"),
+                        string(name: 'REPOSITORY_NAME', value: "${REPOSITORY_NAME}"),
+                        string(name: 'SERVICE_NAME', value: "${SERVICE_NAME}"), 
+                        string(name: 'ENVIRONMENT', value: 'sandbox')
+                    ]
+                }
+            }
+        }
+
+    }
+    post{
+        always{
+            cleanWs()
+        }
+        success{
+            echo "========pipeline executed successfully ========"
+        }
+        failure{
+            echo "========pipeline execution failed========"
+        }
+    }
+}
