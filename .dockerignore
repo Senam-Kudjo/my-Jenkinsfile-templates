@@ -1,6 +1,6 @@
 # === Maven / Gradle build artifacts ===
-target/
-build/
+##target/
+##build/
 .gradle/
 !build/libs/*.jar
 !target/*.jar
