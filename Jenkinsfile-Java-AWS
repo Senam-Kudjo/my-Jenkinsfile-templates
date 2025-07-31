@@ -6,6 +6,8 @@ pipeline{
     options {
         timestamps()
         timeout(time:20, unit:'MINUTES')
+        disableResume()
+        disableConcurrentBuilds abortPrevious: true
 
         office365ConnectorWebhooks([[
             name: 'eTranzact MSTeams',
