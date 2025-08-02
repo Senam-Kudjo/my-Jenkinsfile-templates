@@ -59,14 +59,29 @@ pipeline{
         //   }
        // }
 
+       // // Essential for SonarQube Code Coverage
+        stage("Test Coverage"){
+            steps{
+                script{
+                    catchError(buildResult: 'SUCCESS', message: 'Kindly go through this and resolve this please', stageResult: 'UNSTABLE') {
+                    sh"""
+                        npm run test -- --coverage
+                    """
+                    }
+                    publishHTML([allowMissing: true, alwaysLinkToLastBuild: false, icon: '', keepAll: false, reportDir: 'coverage/lcov-result', reportFiles: 'index.html', 
+                                 reportName: 'Code Coverage HTML Report', reportTitles: '', useWrapperFileDirectly: true])
+                }
+            }
+        }
+
+        
         // Run Static Code Analysis
         stage('Code Quality Checks') {
             steps {
                 script{
-                    def REPOSITORY_NAME = "${env.GIT_URL.split('/').last().replace('.git', '').toLowerCase()}"
                     def scannerHome = tool 'sonarscaner';
                     withSonarQubeEnv('eTranzact GH Sonarqube Server') {
-                        sh "${scannerHome}/bin/sonar-scanner -Dsonar.projectKey=${REPOSITORY_NAME} -Dsonar.projectName=${REPOSITORY_NAME}"
+                        sh "${scannerHome}/bin/sonar-scanner -Dsonar.projectKey=${REPOSITORY_NAME} -Dsonar.projectName=${REPOSITORY_NAME} -Dsonar.javascript.lcov.reportPaths=./coverage/lcov.info"
                     }
                 }
             }
