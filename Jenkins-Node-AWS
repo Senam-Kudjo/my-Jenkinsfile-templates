@@ -52,6 +52,13 @@ pipeline{
                 }
         }
 
+// The OWASP just checks the vulnerability of your dependency ... commented out because it takes too long to scan and report on first try.
+        //stage('OWASP Dependency Check') {
+         //   steps {
+        //        dependencyCheck odcInstallation: 'OWASP Dependency Check'
+        //   }
+       // }
+
         // Run Static Code Analysis
         stage('Code Quality Checks') {
             steps {
