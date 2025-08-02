@@ -167,6 +167,7 @@ steps {
                 }
             }
             steps {
+                script{
                   // set this id below in the global credentials using the ssh username and private key
                   sshagent(['deploy-to-<instance_name>']) {
                       sh '''
@@ -179,6 +180,7 @@ steps {
                       "
                       '''
                   }
+            }
             }
         }
     }
