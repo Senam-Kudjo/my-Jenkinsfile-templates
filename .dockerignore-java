@@ -51,26 +51,16 @@ build/reports/
 Dockerfile.*
 docker-compose.*
 .dockerignore
-.env
+# .env
 *.env
 *.yml
 *.yaml
 
 # === Application configs (optional) ===
 # Comment out if you need these
-*.properties
+# *.properties
 *.yml
 *.yaml
-
-# === Node/npm frontends (if any) ===
-node_modules/
-npm-debug.log
-yarn.lock
-pnpm-lock.yaml
-package-lock.json
-dist/
-public/
-frontend/node_modules/
 
 # === Snapshots or old files ===
 *.old
@@ -79,8 +69,8 @@ frontend/node_modules/
 *.bak
 
 # === Java-specific ===
-*.class
-*.jar
+# *.class
+# *.jar
 *.war
 *.ear
 
