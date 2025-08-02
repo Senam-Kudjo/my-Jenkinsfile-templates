@@ -30,7 +30,7 @@ Thumbs.db
 *.log
 
 # === Env and config files ===
-.env
+# .env
 .env.*
 *.local
 
