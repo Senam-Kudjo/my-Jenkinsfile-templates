@@ -1,7 +1,9 @@
 # Jenkins-GitHub-container-image-fixer
 # A pipeline script in Jenkins that sets the new container image into your GIToPS repo
-# Do not forget to add the variables in the script into your Jenkins pipeline configuration
-
+# Do not forget to add the variables in the script into your Jenkins pipeline configuration by ticking "the project is paramitized" box
+# then select "String Parameter" five times and put in the variable names in them.
+# the ff variables, IMAGETAG => latest (Default Value), BUILD_TRIGGERED_BY, REPOSITORY_NAME, DEPLOYMENT_MANIFEST_NAME, ENVIRONMENT
+# the Default values for the variables will be passed automatically when the mutli pipeline that runs the actual Jenkinsfile is successfully completed.
 
 node {
 
