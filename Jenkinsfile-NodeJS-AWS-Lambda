@@ -1,0 +1,250 @@
+
+pipeline{
+
+    agent any
+    tools {nodejs "NodeJS_22.16.0"}
+
+
+    options {
+        timestamps()
+        timeout(time:20, unit:'MINUTES')
+
+        office365ConnectorWebhooks([[
+            name: 'eTranzact MSTeams',
+            startNotification: true,
+            notifySuccess: true,
+            notifyAborted: true,
+            notifyFailure: true,
+            url: "${Build_Alerts_WebHook_URL}"
+        ]])
+    }
+
+
+    environment {
+        RELEASE_TAG = "release"
+        DEV_BUILD_TAG = "dev"
+        region = 'us-west-1' // Change to your region
+    }
+
+
+    stages{
+        // Checkout Code From GitHub
+        stage("CheckOut"){
+            steps{
+                script{
+                    checkout scm
+                }
+            }
+        }
+
+        // Compile Source Code
+        stage('Compile Source Code') {
+            steps {
+                    sh 'npm install --legacy-peer-deps'
+                  // sh 'npm install --no-audit'
+                }
+        }
+
+        stage('NPM Dependency Auditing') {
+            steps {
+                    sh 'npm audit --audit-level=critical'
+                }
+        }
+
+// The OWASP just checks the vulnerability of your dependency ... commented out because it takes too long to scan and report on first try.
+        //stage('OWASP Dependency Check') {
+         //   steps {
+        //        dependencyCheck odcInstallation: 'OWASP Dependency Check'
+        //   }
+       // }
+
+       // // Essential for SonarQube Code Coverage
+        stage("Test Coverage"){
+            steps{
+                script{
+                    catchError(buildResult: 'SUCCESS', message: 'Kindly go through this and resolve this please', stageResult: 'UNSTABLE') {
+                    sh"""
+                        npm run test -- --coverage
+                    """
+                    }
+                    publishHTML([allowMissing: true, alwaysLinkToLastBuild: false, icon: '', keepAll: false, reportDir: 'coverage/lcov-result', reportFiles: 'index.html', 
+                                 reportName: 'Code Coverage HTML Report', reportTitles: '', useWrapperFileDirectly: true])
+                }
+            }
+        }
+
+        
+        // Run Static Code Analysis
+        stage('Code Quality Checks') {
+            steps {
+                script{
+                    def scannerHome = tool 'sonarscaner';
+                    def BUCKET_NAME = "${env.GIT_URL.split('/').last().replace('.git', '').toLowerCase()}";
+                    withSonarQubeEnv('eTranzact GH Sonarqube Server') {
+                        sh "${scannerHome}/bin/sonar-scanner -Dsonar.projectKey=${BUCKET_NAME} -Dsonar.projectName=${BUCKET_NAME} -Dsonar.javascript.lcov.reportPaths=./coverage/lcov.info"
+                    }
+                }
+            }
+        }
+
+        // Quality Gates Inspection
+        // stage("Quality Gates Inspection") {
+        //     steps {
+        //         waitForQualityGate abortPipeline: true, credentialsId: 'Jenkins-Sonarqube-CICD-Secret-Access-Token'
+        //     }
+        // }
+
+        // Install & Build Node Modules
+        stage("Build Node Modules"){
+            steps{
+                script{
+                    sh"""
+                        npm run build
+                    """
+                }
+            }
+        }
+
+        // Execute Unit Test Cases
+        // stage("Unit Tests"){
+        //     steps{
+        //         script{
+        //             sh"""
+        //                 npm test
+        //             """
+        //         }
+        //     }
+        // }
+
+
+        // Package Deployable Artifact & Publish To ECR Storage Repository
+        stage("Build Docker Image & Push To ECR"){
+            when{
+                anyOf {
+                    branch 'develop'
+
+                    expression {
+                        return env.BRANCH_NAME.startsWith('release/')
+                    }
+                }
+            }
+steps {
+    script {
+        def BUCKET_NAME = "${env.GIT_URL.split('/').last().replace('.git', '').toLowerCase()}"
+        def packageJSON = readJSON file: 'package.json'
+        def packageJSONVersion = packageJSON.version
+        sh 'aws ecr get-login-password --region eu-west-1 | docker login --username AWS --password-stdin ${AWS_Account_URL}'
+
+        // Check if ECR repository exists
+        def repoExists = false
+        try {
+            def ecrRepoCheck = sh(
+                script: "aws ecr describe-repositories --repository-names ${BUCKET_NAME} --region eu-west-1",
+                returnStatus: true
+            )
+            repoExists = (ecrRepoCheck == 0)
+        } catch (Exception e) {
+            echo "Error checking ECR repository: ${e.getMessage()}"
+            repoExists = false
+        }
+
+        // Create repository if it doesn't exist
+        if (!repoExists) {
+            echo "ECR repository ${BUCKET_NAME} not found - creating it"
+            sh "aws ecr create-repository --repository-name ${BUCKET_NAME} --region eu-west-1"
+        }
+
+        // Normal build flow continues regardless
+        if (env.BRANCH_NAME == 'develop') {
+            APP_TAG = "dev-${packageJSONVersion}-${env.BUILD_NUMBER}"
+            echo "Building Development Image: ${APP_TAG} From ${env.BRANCH_NAME}"
+        } else {
+            APP_TAG = "release-${packageJSONVersion}-${env.BUILD_NUMBER}"
+            echo "Building Release Image: ${APP_TAG} From ${env.BRANCH_NAME}"
+        }
+
+        // Always build and push
+        app = docker.build("$BUCKET_NAME:$APP_TAG")
+        docker.withRegistry("${ECR_Repository_URL}") {
+            app.push("$APP_TAG")
+        }
+        echo "Successfully built and pushed image: ${BUCKET_NAME}:${APP_TAG}"
+    }
+}
+        }
+
+        // Deploy To SandBox Environment [If Branch == Develop]
+// Deploy To SandBox Environment [If Branch == Develop]
+        // Write a script that deploys the container image to a lambda function but first a check needs to be created
+        // check if the function name which is the repo name already exist
+        // if it doesn't then create a function with the repo-name but if it does already exist then just update the function
+
+stage('Deploy to Lambda') {
+    steps {
+        script {
+            def functionName = "${env.GIT_URL.split('/').last().replace('.git', '').toLowerCase()}"
+            def accountId = sh(script: "aws sts get-caller-identity --query 'Account' --output text", returnStdout: true).trim()
+            // def region = 'us-west-1' // Change to your region
+            def ecrImageUri = "${APP_TAG}" //later swap the ecrImageUrl with ${APP_TAG} and test if successful
+
+            // Check if Lambda function exists
+            def functionExists = false
+            try {
+                def describeOutput = sh(
+                    script: "aws lambda get-function --function-name ${functionName} --region ${region} || true",
+                    returnStdout: true
+                )
+                if (!describeOutput.contains('ResourceNotFoundException')) {
+                    functionExists = true
+                }
+            } catch (err) {
+                echo "Warning: Error checking Lambda function (may not exist): ${err}"
+            }
+
+            // Deploy or update Lambda
+            if (!functionExists) {
+                echo "Lambda function '${functionName}' does not exist. Creating..."
+                sh """
+                    aws lambda create-function \
+                        --function-name ${functionName} \
+                        --package-type Image \
+                        --code ImageUri=${ecrImageUri} \
+                        --role arn:aws:iam::${accountId}:role/lambda-execution-role \ // Replace with your role
+                        --region ${region} \
+                        --timeout 10 \
+                        --memory-size 900
+                """
+            } else {
+                echo "Lambda function '${functionName}' exists. Updating..."
+                sh """
+                    aws lambda update-function-code \
+                        --function-name ${functionName} \
+                        --image-uri ${ecrImageUri} \
+                        --region ${region}
+                """
+            }
+
+            // Wait for deployment to complete
+            sh """
+                aws lambda wait function-updated \
+                    --function-name ${functionName} \
+                    --region ${region}
+            """
+            echo "Lambda deployment completed successfully!"
+        }
+    }
+}
+
+    }
+    post{
+        always{
+            cleanWs()
+        }
+        success{
+            echo "========pipeline executed successfully ========"
+        }
+        failure{
+            echo "========pipeline execution failed========"
+        }
+    }
+}
