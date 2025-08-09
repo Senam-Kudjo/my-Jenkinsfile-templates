@@ -1,0 +1,139 @@
+//WILL GO THROUGH LATER
+
+pipeline {
+    agent any
+    environment {
+        AWS_REGION = 'us-east-1'
+        REPO_NAME = 'my-application'  // Typically passed as parameter
+        ARTIFACT_NAME = "app-${env.BUILD_ID}.zip"
+    }
+    stages {
+        // STAGE 1: Verify Prerequisites
+        stage('Verify AWS Access') {
+            steps {
+                script {
+                    env.AWS_ACCOUNT_ID = sh(
+                        script: 'aws sts get-caller-identity --query Account --output text',
+                        returnStdout: true
+                    ).trim()
+                    echo "Connected to AWS Account: ${env.AWS_ACCOUNT_ID}"
+                }
+            }
+        }
+
+        // STAGE 2: Build Application
+        stage('Build Application') {
+            steps {
+                sh 'npm install'
+                sh 'npm run build'
+                sh "zip -r ${env.ARTIFACT_NAME} dist/"
+                archiveArtifacts artifacts: "${env.ARTIFACT_NAME}", onlyIfSuccessful: true
+            }
+        }
+
+        // STAGE 3: S3 Deployment
+        stage('Deploy to S3') {
+            steps {
+                script {
+                    env.S3_BUCKET = env.REPO_NAME.toLowerCase()
+                    env.S3_KEY = "builds/${env.BUILD_TAG}/${env.ARTIFACT_NAME}"
+
+                    // Create bucket if not exists (with versioning)
+                    if (!s3BucketExists(env.S3_BUCKET)) {
+                        sh """
+                            aws s3api create-bucket \
+                                --bucket ${env.S3_BUCKET} \
+                                --region ${env.AWS_REGION} \
+                                --create-bucket-configuration LocationConstraint=${env.AWS_REGION}
+                            aws s3api put-bucket-versioning \
+                                --bucket ${env.S3_BUCKET} \
+                                --versioning-configuration Status=Enabled
+                        """
+                    }
+
+                    // Upload artifact
+                    sh "aws s3 cp ${env.ARTIFACT_NAME} s3://${env.S3_BUCKET}/${env.S3_KEY}"
+                }
+            }
+        }
+
+        // STAGE 4: Conditional Lambda Deployment
+        stage('Lambda Synchronization') {
+            when {
+                expression { 
+                    return env.S3_BUCKET == env.REPO_NAME.toLowerCase() 
+                }
+            }
+            steps {
+                script {
+                    try {
+                        // Update existing Lambda
+                        sh """
+                            aws lambda update-function-code \
+                                --function-name ${env.REPO_NAME} \
+                                --s3-bucket ${env.S3_BUCKET} \
+                                --s3-key ${env.S3_KEY} \
+                                --region ${env.AWS_REGION}
+                        """
+                        echo "Lambda function updated successfully"
+                    } catch (err) {
+                        // Create new Lambda if update fails
+                        echo "Creating new Lambda function"
+                        sh """
+                            aws lambda create-function \
+                                --function-name ${env.REPO_NAME} \
+                                --runtime nodejs18.x \
+                                --handler index.handler \
+                                --role arn:aws:iam::${env.AWS_ACCOUNT_ID}:role/lambda-execution-role \
+                                --code S3Bucket=${env.S3_BUCKET},S3Key=${env.S3_KEY} \
+                                --region ${env.AWS_REGION}
+                        """
+                    }
+
+                    // Wait for stabilization
+                    sh """
+                        aws lambda wait function-updated \
+                            --function-name ${env.REPO_NAME} \
+                            --region ${env.AWS_REGION}
+                    """
+                }
+            }
+        }
+
+        // STAGE 5: CloudFront Cache Invalidation
+        stage('Invalidate CloudFront') {
+            steps {
+                script {
+                    withCredentials([string(credentialsId: 'cloudfront-dist-id', variable: 'CLOUDFRONT_DIST_ID')]) {
+                        sh """
+                            aws cloudfront create-invalidation \
+                                --distribution-id ${CLOUDFRONT_DIST_ID} \
+                                --paths "/api/*" "/static/*"
+                        """
+                    }
+                    echo "CloudFront cache invalidated for critical paths"
+                }
+            }
+        }
+    }
+    post {
+        always {
+            cleanWs()
+        }
+        success {
+            slackSend message: "Deployment succeeded: ${env.JOB_NAME} #${env.BUILD_NUMBER}"
+        }
+        failure {
+            slackSend message: "Deployment failed: ${env.JOB_NAME} #${env.BUILD_NUMBER}"
+        }
+    }
+}
+
+// Helper Methods
+def s3BucketExists(String bucketName) {
+    def output = sh(
+        script: "aws s3api list-buckets --query 'Buckets[?Name==`${bucketName}`].Name' --output text",
+        returnStdout: true
+    ).trim()
+    return output == bucketName
+}
