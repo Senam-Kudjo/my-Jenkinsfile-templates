@@ -169,6 +169,8 @@ steps {
             app.push("$APP_TAG")
         }
         echo "Successfully built and pushed image: ${BUCKET_NAME}:${APP_TAG}"
+        echo ${ECR_Repository_URL}
+        echo ${APP_TAG}
     }
 }
         }
