@@ -22,8 +22,6 @@ pipeline{
     environment {
         RELEASE_TAG = "release"
         DEV_BUILD_TAG = "dev"
-        DEPLOYMENT_MANIFEST_NAME = "nugs.yaml" 
-        SERVICE_NAME = "nugs"
     }
 
 
@@ -170,6 +168,9 @@ steps {
 
                 script {
                     echo "Triggering SandBox Environment Deployment Script"
+                    def REPOSITORY_NAME = "${env.GIT_URL.split('/').last().replace('.git', '').toLowerCase()}"
+                    def DEPLOYMENT_MANIFEST_NAME = "${REPOSITORY_NAME}.yaml"
+                    def SERVICE_NAME = "${REPOSITORY_NAME}"
                     // BUILD_TRIGGERED_BY = currentBuild.getBuildCauses()[0].userId
                     // echo "BUILD_TRIGGERED_BY: ${BUILD_TRIGGERED_BY}"
                     echo "${TAG}"
