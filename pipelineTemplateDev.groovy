@@ -1,0 +1,187 @@
+##The aim is to make them work for both Java and JavaScript Frameworks appications ... currently only works for Java apps.
+## Will set conditions and filesearchs for certain stages to trigger ... that is how we will find the difference.
+
+def call() {
+pipeline{
+
+    agent any
+
+    options {
+        timestamps()
+        timeout(time:20, unit:'MINUTES')
+        disableResume()
+        disableConcurrentBuilds abortPrevious: true
+
+        office365ConnectorWebhooks([[
+            name: 'eTranzact MSTeams',
+            startNotification: true,
+            notifySuccess: true,
+            notifyAborted: true,
+            notifyFailure: true,
+            url: "${Build_Alerts_WebHook_URL}"
+        ]])
+    }
+
+    environment {
+        RELEASE_TAG = "release"
+        DEV_BUILD_TAG = "dev"
+    }
+
+
+    stages{
+
+        // Checkout Code From GitHub
+        stage("SourceCode CheckOut"){
+            steps{
+                script{
+                    checkout scm
+                }
+            }
+        }
+
+
+        // Compile Source Code
+        stage('Compile Source Code') {
+            steps {
+                    sh 'mvn compile'
+                }
+        }
+
+        // Test Source Code
+        // stage('Run Unit Test Cases') {
+        //     steps {
+        //             sh 'mvn test'
+        //         }
+        // }
+
+
+   //     // Run Static Code Analysis
+        stage('Code Quality Checks') {
+            steps {
+                script {
+                    def scannerHome = tool 'sonarscaner';
+                    def REPOSITORY_NAME = "${env.GIT_URL.split('/').last().replace('.git', '').toLowerCase()}"
+                    withSonarQubeEnv('eTranzact GH Sonarqube Server') {
+                        sh "${scannerHome}/bin/sonar-scanner -Dsonar.projectKey=${REPOSITORY_NAME} -Dsonar.projectName=${REPOSITORY_NAME} -Dsonar.java.binaries=."
+                    }
+                }
+        }
+
+    }
+
+   //     // Quality Gates Inspection
+        // stage('Quality Gates Inspection') {
+        //     steps {
+        //         script{
+        //             waitForQualityGate abortPipeline: true, credentialsId: 'Jenkins-Sonarqube-CICD-Secret-Access-Token'
+        //         }
+        //     }
+
+        // }
+
+
+        // Build Code Into Deployable Artifact
+        stage("Build Artifact"){
+            steps{
+                script{
+                    sh"""
+                        mvn clean package -DskipTests=true -Dquarkus.package.type=uber-jar
+                    """
+                }
+            }
+        }
+
+
+        // Package Deployable Artifact & Publish To ECR Storage Repository
+        stage ('Build Docker Image & Push To ECR') {
+            when{
+                anyOf {
+                    branch 'develop'
+                    expression {
+                        return env.BRANCH_NAME.startsWith('release/')
+                    }
+                }
+            }
+steps {
+    script {
+        // Login to ECR
+        def REPOSITORY_NAME = "${env.GIT_URL.split('/').last().replace('.git', '').toLowerCase()}"
+        sh 'aws ecr get-login-password --region eu-west-1 | docker login --username AWS --password-stdin ${AWS_Account_URL}'
+        // Automatically get GitHub repo name
+        echo "Using repository name: ${REPOSITORY_NAME}"
+
+
+
+        // Check if ECR repository exists, create if not
+        def repoExists = false
+        try {
+            def ecrRepoCheck = sh(
+                script: "aws ecr describe-repositories --repository-names ${REPOSITORY_NAME} --region eu-west-1",
+                returnStatus: true
+            )
+            repoExists = (ecrRepoCheck == 0)
+        } catch (Exception e) {
+            echo "Error checking ECR repository: ${e.getMessage()}"
+            repoExists = false
+        }
+
+        if (!repoExists) {
+            echo "ECR repository ${REPOSITORY_NAME} not found - creating it"
+            sh "aws ecr create-repository --repository-name ${REPOSITORY_NAME} --region eu-west-1"
+        }
+
+        // Read version from pom.xml
+        def pom = readMavenPom file: 'pom.xml'
+        def version = pom.version
+
+        // Determine tag based on branch
+        if (env.BRANCH_NAME == 'develop') {
+            TAG = "${DEV_BUILD_TAG}-${version}-${env.BUILD_NUMBER}"
+            echo "Building Docker Image For Development ${TAG}"
+        } else {
+            TAG = "${RELEASE_TAG}-${version}-${env.BUILD_NUMBER}"
+            echo "Building Docker Image For Release ${TAG}"
+        }
+
+        // Build and push image
+        app = docker.build("$REPOSITORY_NAME:$TAG")
+        docker.withRegistry("${ECR_Repository_URL}") {
+            app.push("$TAG")
+        }
+        
+        // Set environment variable and output
+        env.TAG = "${TAG}"
+        echo "Successfully built and pushed image with tag: ${TAG}"
+    }
+}
+        }
+
+
+        // Deploy To SandBox Environment [If Branch == Develop]
+        stage ('Deploy To SandBox Environment') {
+            when{
+                anyOf {
+                    branch 'develop'
+                    expression {
+                        return env.BRANCH_NAME.startsWith('release/')
+                    }
+                }
+            }
+            steps {
+
+                script {
+                    echo "Triggering SandBox Environment Deployment Script"
+                    def REPOSITORY_NAME = "${env.GIT_URL.split('/').last().replace('.git', '').toLowerCase()}"
+                    def DEPLOYMENT_MANIFEST_NAME = "${REPOSITORY_NAME}.yaml"
+                    def SERVICE_NAME = "${REPOSITORY_NAME}"
+                    // BUILD_TRIGGERED_BY = currentBuild.getBuildCauses()[0].userId
+                    // echo "BUILD_TRIGGERED_BY: ${BUILD_TRIGGERED_BY}"
+                    echo "${TAG}"
+                    build job: 'gh-argocd-full-auto', parameters: [string(name: 'IMAGETAG', value: "${TAG}"), string(name: 'DEPLOYMENT_MANIFEST_NAME', value: "${DEPLOYMENT_MANIFEST_NAME}"), string(name: 'REPOSITORY_NAME', value: "${REPOSITORY_NAME}"), string(name: 'SERVICE_NAME', value: "${SERVICE_NAME}"), string(name: 'ENVIRONMENT', value: 'sandbox')]
+                }
+            }
+        }
+    }
+
+}
+}
