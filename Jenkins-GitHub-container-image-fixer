@@ -1,41 +1,64 @@
 # Jenkins-GitHub-container-image-fixer
-# A pipeline script in Jenkins that sets the new container image into your GIToPS repo
+# A pipeline script in Jenkins that checks and creates new k8s deployment by automatically creating the deployments argocd application and manifest file in your gitops repo and also sets the new container image into your GIToPS repo
 # Do not forget to add the variables in the script into your Jenkins pipeline configuration by ticking "the project is paramitized" box
 # then select "String Parameter" five times and put in the variable names in them.
 # the ff variables, IMAGETAG => latest (Default Value), BUILD_TRIGGERED_BY, REPOSITORY_NAME, DEPLOYMENT_MANIFEST_NAME, ENVIRONMENT
-# the Default values for the variables will be passed automatically when the mutli pipeline that runs the actual Jenkinsfile is successfully completed.
+# the values for the variables will be passed automatically when the mutli pipeline that runs the actual Jenkinsfile is successfully completed.
 
 node {
 
+
     stage('Checkout Repository') {
-        checkout scm: scmGit(branches: [[name: '*/master']], extensions: [], userRemoteConfigs: [[credentialsId: 'bf5de993-b44a-4c70-acf9-bc05ded62180', url: 'https://github.com/etranzact-gh/iac_main_kubernetes_argocd_project.git']])
+        checkout scm: scmGit(branches: [[name: '*/master']], extensions: [], userRemoteConfigs: [[credentialsId: 'bf5de993-b44a-4c70-acf9-bc05ded62180', url: 'https://github.com/etranzact-gh/iac-argocd-kubernetes-sandbox-repo.git']])
 
     }
-
-    stage('Update Configfile') { // 
-            script {
-                echo "BUILD_TRIGGERED_BY: ${BUILD_TRIGGERED_BY}"
-                //def encodedPassword = URLEncoder.encode("$GIT_PASSWORD",'UTF-8')
-                //sh "git switch master"
-
-                sh "sed -i \"s/${REPOSITORY_NAME}:.*/${REPOSITORY_NAME}:${IMAGETAG}/g\" ${ENVIRONMENT}/manifests/${SERVICE_NAME}/${DEPLOYMENT_MANIFEST_NAME}"
-                sh " cat ${ENVIRONMENT}/manifests/${SERVICE_NAME}/${DEPLOYMENT_MANIFEST_NAME}"
-            }
-    }
-
-    stage('Commit Changes ') {
+    
+    stage('GitOps Automation') {
       script{
             withCredentials([usernamePassword(credentialsId: 'bf5de993-b44a-4c70-acf9-bc05ded62180', passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME')]) {
-             sh """ 
-                git config user.email devopsgh@etranzact.com.gh
-                git config user.name etranzact-gh-cicd
-                git add .
-                git commit -m 'Updated Build ${REPOSITORY_NAME} With ${IMAGETAG}'
-                git remote set-url origin https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/etranzact-gh/iac_main_kubernetes_argocd_project.git
-                git push origin HEAD:master
-            """
+                    // Check if directory exists
+                    if (fileExists("sandbox/manifest/${SERVICE_NAME}")) {
+                        echo "Directory sandbox/manifest/${SERVICE_NAME} already exists. Replacing old image with new image."
+                        echo "BUILD_TRIGGERED_BY: ${BUILD_TRIGGERED_BY}"
+                        sh "cd sandbox/manifest/${SERVICE_NAME}"
+                        sh "sed -i \"s/${REPOSITORY_NAME}:.*/${REPOSITORY_NAME}:${IMAGETAG}/g\" ${ENVIRONMENT}/manifest/${SERVICE_NAME}/${DEPLOYMENT_MANIFEST_NAME}"
+                        sh " cat ${ENVIRONMENT}/manifest/${SERVICE_NAME}/${DEPLOYMENT_MANIFEST_NAME}"
+                                     sh """
+                                        git config user.email "devopsgh@etranzact.com.gh"
+                                        git config user.name etranzact-gh-cicd
+                                        git add .
+                                        git commit -m 'Updated Build ${REPOSITORY_NAME} With ${IMAGETAG}'
+                                        git remote set-url origin https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/etranzact-gh/iac-argocd-kubernetes-sandbox-repo.git
+                                        git push origin HEAD:master
+                                    """
+                        return  // Exit the stage early
+                    } else {
+                        echo "Directory sandbox/manifest/${REPOSITORY_NAME} does not exist. Proceeding with script execution."
+                        echo "${IMAGETAG}"
+                        // Execute the bash script with APP_NAME as parameter
+                        sh 'chmod +x script.sh'
+                        sh "./script.sh ${REPOSITORY_NAME} ${REPOSITORY_NAME}:${IMAGETAG}"
+                                     sh """
+                                        git config user.email "devopsgh@etranzact.com.gh"
+                                        git config user.name etranzact-gh-cicd
+                                        git add .
+                                        git commit -m 'Updated Build ${REPOSITORY_NAME} With ${IMAGETAG}'
+                                        git remote set-url origin https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/etranzact-gh/iac-argocd-kubernetes-sandbox-repo.git
+                                        git push origin HEAD:master
+                                    """
+                        
+                    }
             }
       }
+
+
+    }
+
+    stage('Deployed Ya Beech🫡') {
+      script{
+          echo "Your application has been successfully deployed! 👊😘 0...🥷...👌 now off you pop you twat"
+      }
+
 
     }
     
