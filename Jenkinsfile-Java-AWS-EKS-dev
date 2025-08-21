@@ -1,4 +1,3 @@
-
 pipeline{
 
     agent any
@@ -174,7 +173,7 @@ steps {
                     // BUILD_TRIGGERED_BY = currentBuild.getBuildCauses()[0].userId
                     // echo "BUILD_TRIGGERED_BY: ${BUILD_TRIGGERED_BY}"
                     echo "${TAG}"
-                    build job: 'gh-argocd-etz-k8s-deployment-job', parameters: [string(name: 'IMAGETAG', value: "${TAG}"), string(name: 'DEPLOYMENT_MANIFEST_NAME', value: "${DEPLOYMENT_MANIFEST_NAME}"), string(name: 'REPOSITORY_NAME', value: "${REPOSITORY_NAME}"), string(name: 'SERVICE_NAME', value: "${SERVICE_NAME}"), string(name: 'ENVIRONMENT', value: 'sandbox')]
+                    build job: 'gh-argocd-full-auto', parameters: [string(name: 'IMAGETAG', value: "${TAG}"), string(name: 'DEPLOYMENT_MANIFEST_NAME', value: "${DEPLOYMENT_MANIFEST_NAME}"), string(name: 'REPOSITORY_NAME', value: "${REPOSITORY_NAME}"), string(name: 'SERVICE_NAME', value: "${SERVICE_NAME}"), string(name: 'ENVIRONMENT', value: 'sandbox')]
                 }
             }
         }
