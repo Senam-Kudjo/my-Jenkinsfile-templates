@@ -1,4 +1,5 @@
-# Jenkins-GitHub-container-image-fixer
+Handles the entire GitOps deployment for new and old applications. (GitHub -> ArgoCD -> K8S Cluster)
+# Jenkins-GitHub-ArgoCDcontainer-image-fixer
 # A pipeline script in Jenkins that checks and creates new k8s deployment by automatically creating the deployments argocd application and manifest file in your gitops repo and also sets the new container image into your GIToPS repo
 # Do not forget to add the variables in the script into your Jenkins pipeline configuration by ticking "the project is paramitized" box
 # then select "String Parameter" five times and put in the variable names in them.
