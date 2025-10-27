@@ -1,6 +1,6 @@
 #### THIS IS THE TEMPLATE FILE MY SCRIPT USES TO CREATE NEW ARGOCD APPLICATIONS FOR NEW DEPLOYMENTS ####
 
-#### SHOULD BE PLACED AT THE ROOT DIRECTORY OF THE ARGOCD-K8S REPO #### eg. ./template-application.yaml
+#### SHOULD BE PLACED AT THE ROOT DIRECTORY OF THE ARGOCD-K8S REPO #### eg. ./template-application.yaml ... not within the sandbox or environment folder/directory
 
 apiVersion: argoproj.io/v1alpha1
 kind: Application
