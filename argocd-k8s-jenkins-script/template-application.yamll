@@ -1,0 +1,22 @@
+#### THIS IS THE TEMPLATE FILE MY SCRIPT USES TO CREATE NEW ARGOCD APPLICATIONS FOR NEW DEPLOYMENTS ####
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app_name
+  namespace: argocd
+spec:
+  destination:
+    namespace: main-etranzact-sandbox
+    server: 'https://kubernetes.default.svc'
+  source:
+    path: sandbox/manifest/app_name
+    repoURL: 'https://github.com/etranzact-gh/iac-argocd-kubernetes-sandbox-repo.git'
+    targetRevision: HEAD
+  project: sandbox
+  syncPolicy:
+    syncOptions:
+    - CreateNamespace=true
+    automated:
+      prune: true
+      selfHeal: true
