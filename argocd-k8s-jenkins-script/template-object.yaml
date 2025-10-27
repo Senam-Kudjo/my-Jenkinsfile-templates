@@ -1,0 +1,130 @@
+### THIS IS THE TEMPLATE FILE THE SCRIPT WILL USE FOR CHECKING AND CREATING NEW KUBERNETES OBJECTS AND/OR inserting new images into already exisiting objects.
+
+### PUT THIS FILE IN THE ROOT OF THE MANIFEST PATH eg. /sandbox/manifest/template-object.yaml
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: sandbox-app_name-service
+  namespace: main-etranzact-sandbox
+spec:
+  selector:
+    app: sandbox-app_name
+  type: ClusterIP
+  # sessionAffinity: None
+  # sessionAffinityConfig:
+  #   clientIP:
+  #     timeoutSeconds: 10800
+  ports:
+  - name: app_name
+    protocol: TCP
+    port: 3000
+    targetPort: 3000
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sandbox-app_name-deployment
+  namespace: main-etranzact-sandbox
+  labels:
+    app: sandbox-app_name
+spec:
+  minReadySeconds: 15
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      app: sandbox-app_name
+  replicas: 1
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: sandbox-app_name
+    spec:
+      containers:
+      - name: sandbox-app_name
+        image: 842092678711.dkr.ecr.eu-west-1.amazonaws.com/reimage
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 3000
+          name: app_name
+        volumeMounts:
+        - name: sandbox-app_name-volume
+          mountPath: /home/app/config
+          readOnly: true
+        envFrom:
+        - configMapRef:
+            name: sandbox-app_name-configmap
+        # resources:
+        #   requests:
+        #     cpu: 100m
+        #     memory: 256M
+        #   limits:
+        #     cpu: 120m
+        #     memory: 512M
+        # livenessProbe:
+        #   tcpSocket:
+        #     port: 3000
+        #   initialDelaySeconds: 5
+        #   timeoutSeconds: 5
+        #   successThreshold: 1
+        #   failureThreshold: 3
+        #   periodSeconds: 10
+        # readinessProbe:
+        #   httpGet:
+        #     path: /api/v1/health/liveness
+        #     port: 3000
+        #   initialDelaySeconds: 5
+        #   timeoutSeconds: 2
+        #   successThreshold: 1
+        #   failureThreshold: 3
+        #   periodSeconds: 5
+      restartPolicy: Always
+      imagePullSecrets:
+      - name: etz-ecr
+      volumes:
+      - name: sandbox-app_name-volume
+        projected:
+          sources:
+          - configMap:
+              name: sandbox-app_name-configmap
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sandbox-app_name-configmap
+  namespace: main-etranzact-sandbox
+data:
+---
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: sandbox-app_name-ingress
+  namespace: main-etranzact-sandbox
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "X-Frame-Options: DENY";
+      more_set_headers "X-Content-Type-Options: nosniff";
+      more_set_headers "server: hide";
+spec:
+  ingressClassName: nginx
+  rules:
+  - http:
+      paths:
+      - path: /app_name(/|$)(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: sandbox-app_name-service
+            port:
+              name: app_name
