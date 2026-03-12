@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app_name
+  namespace: argocd
+spec:
+  destination:
+    namespace: main-etranzact-prod
+    server: 'https://kubernetes.default.svc'
+  source:
+    path: production/manifests/app_name
+    repoURL: 'https://github.com/etranzact-gh/iac_main_kubernetes_argocd_project.git'
+    targetRevision: HEAD
+  project: production
+  syncPolicy:
+    syncOptions:
+    - CreateNamespace=true
+    automated:
+      prune: true
+      selfHeal: true
