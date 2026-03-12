@@ -18,8 +18,8 @@ spec:
   ports:
   - name: app_name
     protocol: TCP
-    port: 3000
-    targetPort: 3000
+    port: PORTINGO
+    targetPort: PORTINGO
 ---
 
 apiVersion: apps/v1
@@ -30,6 +30,8 @@ metadata:
   labels:
     app: sandbox-app_name
 spec:
+  # securityContext:
+  #   runAsUser: 1010
   minReadySeconds: 15
   revisionHistoryLimit: 5
   selector:
@@ -51,7 +53,7 @@ spec:
         image: 842092678711.dkr.ecr.eu-west-1.amazonaws.com/reimage
         imagePullPolicy: Always
         ports:
-        - containerPort: 3000
+        - containerPort: PORTINGO
           name: app_name
         volumeMounts:
         - name: sandbox-app_name-volume
@@ -69,7 +71,7 @@ spec:
         #     memory: 512M
         # livenessProbe:
         #   tcpSocket:
-        #     port: 3000
+        #     port: PORTINGO
         #   initialDelaySeconds: 5
         #   timeoutSeconds: 5
         #   successThreshold: 1
@@ -78,7 +80,7 @@ spec:
         # readinessProbe:
         #   httpGet:
         #     path: /api/v1/health/liveness
-        #     port: 3000
+        #     port: PORTINGO
         #   initialDelaySeconds: 5
         #   timeoutSeconds: 2
         #   successThreshold: 1
@@ -110,12 +112,6 @@ metadata:
   namespace: main-etranzact-sandbox
   annotations:
     nginx.ingress.kubernetes.io/rewrite-target: /$2
-    nginx.ingress.kubernetes.io/use-regex: "true"
-    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
-    nginx.ingress.kubernetes.io/configuration-snippet: |
-      more_set_headers "X-Frame-Options: DENY";
-      more_set_headers "X-Content-Type-Options: nosniff";
-      more_set_headers "server: hide";
 spec:
   ingressClassName: nginx
   rules:
