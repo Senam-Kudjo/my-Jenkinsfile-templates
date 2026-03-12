@@ -16,13 +16,13 @@ node {
 
 
     stage('Checkout Repository') {
-        checkout scm: scmGit(branches: [[name: '*/master']], extensions: [], userRemoteConfigs: [[credentialsId: 'bf5de993-b44a-4c70-acf9-bc05ded62180', url: 'https://github.com/etranzact-gh/iac-argocd-kubernetes-sandbox-repo.git']])
+        checkout scm: scmGit(branches: [[name: '*/master']], extensions: [], userRemoteConfigs: [[credentialsId: 'etz-github-login', url: 'https://github.com/etranzact-gh/iac-argocd-kubernetes-sandbox-repo.git']])
 
     }
     
     stage('GitOps Automation') {
       script{
-            withCredentials([usernamePassword(credentialsId: 'bf5de993-b44a-4c70-acf9-bc05ded62180', passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME')]) {
+            withCredentials([usernamePassword(credentialsId: 'etz-github-login', passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME')]) {
                     // Check if directory exists
                     if (fileExists("sandbox/manifest/${SERVICE_NAME}")) {
                         echo "Directory sandbox/manifest/${SERVICE_NAME} already exists. Replacing old image with new image."
@@ -44,7 +44,7 @@ node {
                         echo "${IMAGETAG}"
                         // Execute the bash script with APP_NAME as parameter
                         sh 'chmod +x script.sh'
-                        sh "./script.sh ${REPOSITORY_NAME} ${REPOSITORY_NAME}:${IMAGETAG}"
+                        sh "./script.sh ${REPOSITORY_NAME} ${REPOSITORY_NAME}:${IMAGETAG} ${PORTINGO}"
                                      sh """
                                         git config user.email "devopsgh@etranzact.com.gh"
                                         git config user.name etranzact-gh-cicd
