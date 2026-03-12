@@ -1,0 +1,109 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: prod-app_name-service
+  namespace: main-etranzact-prod
+spec:
+  selector:
+    app: prod-app_name
+  type: ClusterIP
+  # sessionAffinity: None
+  # sessionAffinityConfig:
+  #   clientIP:
+  #     timeoutSeconds: 10800
+  ports:
+  - name: app_name
+    protocol: TCP
+    port: PORTINGO
+    targetPort: PORTINGO
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prod-app_name-deployment
+  namespace: main-etranzact-prod
+  labels:
+    app: prod-app_name
+spec:
+  # securityContext:
+  #   runAsUser: 1010
+  minReadySeconds: 15
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      app: prod-app_name
+  replicas: 1
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: prod-app_name
+    spec:
+      containers:
+      - name: prod-app_name
+        image: 842092678711.dkr.ecr.eu-west-1.amazonaws.com/reimage
+        imagePullPolicy: Always
+        ports:
+        - containerPort: PORTINGO
+          name: app_name
+        volumeMounts:
+        - name: prod-app_name-host-logs
+          mountPath: /app/logs # Only mounting logs folder ... Change this according to the workdir used in the dockerfile
+        envFrom:
+        - configMapRef:
+            name: prod-app_name-configmap
+        # resources:
+        #   requests:
+        #     cpu: 100m
+        #     memory: 256M
+        #   limits:
+        #     cpu: 120m
+        #     memory: 512M
+        # livenessProbe:
+        #   tcpSocket:
+        #     port: PORTINGO
+        #   initialDelaySeconds: 5
+        #   timeoutSeconds: 5
+        #   successThreshold: 1
+        #   failureThreshold: 3
+        #   periodSeconds: 10
+        # readinessProbe:
+        #   httpGet:
+        #     path: /api/v1/health/liveness
+        #     port: PORTINGO
+        #   initialDelaySeconds: 5
+        #   timeoutSeconds: 2
+        #   successThreshold: 1
+        #   failureThreshold: 3
+        #   periodSeconds: 5
+      restartPolicy: Always
+      volumes:
+      - name: prod-app_name-host-logs
+        hostPath:
+          path: /opt/k8s/app_name
+          type: DirectoryOrCreate
+          
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prod-app_name-configmap
+  namespace: main-etranzact-prod
+data:
+  quarkus.http.port: "PORTINGO"
+  quarkus.log.file.enable: "true"
+  quarkus.log.file.path: logs/trace.log
+  quarkus.log.file.format: "%d{yyyy-MM-dd HH:mm:ss} %-5p [%c] (%t) %s%e%n"
+  quarkus.log.file.rotation.rotate-on-boot: "false"
+  quarkus.log.file.rotation.file-suffix: ".yyyy-MM-dd"
+  quarkus.log.file.rotation.max-backup-index: "90"
+  quarkus.log.file.rotation.max-file-size: "100M"
+
+
+  
