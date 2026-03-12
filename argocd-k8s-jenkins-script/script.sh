@@ -16,6 +16,7 @@ fi
 function create() {
     local app_name="$1"  # Accept app_name as a function parameter
     local image_name="$2" # Accept image_name as a function parameter
+    local PORTINGO="$3"
 
     cp template-application.yaml sandbox/applications/"${app_name}".yaml
     cd sandbox/applications/
@@ -39,6 +40,7 @@ function create() {
         cp ../template-object.yaml "${app_name}.yaml"
         sed -i "s/app_name/${app_name}/" "${app_name}.yaml"
         sed -i "s/reimage/${image_name}/" "${app_name}.yaml"
+        sed -i "s/PORTINGO/${PORTINGO}/" "${app_name}.yaml"
 
     else
         # If file does not exist
@@ -47,4 +49,4 @@ function create() {
 }
 
 # Call the function with the command-line parameter
-create "$1" "$2"
+create "$1" "$2" "$3"
