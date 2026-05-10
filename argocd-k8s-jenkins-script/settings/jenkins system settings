@@ -1,0 +1,277 @@
+Global properties
+
+Disable deferred wipeout on this node
+?
+
+Disk Space Monitoring Thresholds
+
+✅Environment variables
+List of variables
+?
+Name
+AWS_Account_URL
+Value
+842092678711.dkr.ecr.eu-west-1.amazonaws.com
+
+Delete
+Name
+Build_Alerts_WebHook_URL
+Value
+https://default3d685e6942504b938a79790efcd4e7.2a.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/8fda7bb74e6849d0ad8eb6cb3d6f48de/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=b67VVj3BFmGpJSD0VuNgZhNwiXKJKNhgxDmyxvd7pSM
+
+Delete
+Name
+ECR_Repository_URL
+Value
+https://842092678711.dkr.ecr.eu-west-1.amazonaws.com
+
+Delete
+Name
+SonarQube_Server_URL
+Value
+http://52.18.207.118:9000/
+
+Delete
+Add
+
+Tool Locations
+SonarQube servers
+If checked, job administrators will be able to inject a SonarQube server configuration as environment variables in the build.
+
+Environment variables
+SonarQube installations
+List of SonarQube installations
+Name
+eTranzact GH Sonarqube Server
+Server URL
+Default is http://localhost:9000
+http://52.18.207.118:9000/
+Server authentication token
+SonarQube authentication token. Mandatory when anonymous access is disabled.
+
+Office 365 Connector / Power Automate workflows
+URL
+https://default3d685e6942504b938a79790efcd4e7.2a.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/8fda7bb74e6849d0ad8eb6cb3d6f48de/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=b67VVj3BFmGpJSD0VuNgZhNwiXKJKNhgxDmyxvd7pSM
+Name
+Jenkins_Ms_Teams_Notifications
+
+
+Global Trusted Pipeline Libraries
+Sharable libraries available to any Pipeline jobs running on this system. These libraries will be trusted, meaning they run without “sandbox” restrictions and may use @Grab.
+Library
+Name
+?
+etzSharedLibrary
+Default version
+?
+master
+Currently maps to revision: 63d811d6461fe2b04287ea0b0285a523befc7689
+
+Load implicitly
+?
+
+Allow default version to be overridden
+?
+
+Include @Library changes in job recent changes
+?
+
+Cache fetched versions on controller for quick retrieval
+?
+Retrieval method
+
+Modern SCM
+Loads a library from an SCM plugin using newer interfaces optimized for this purpose. The recommended option when available.
+Source Code Management
+
+Git
+Project Repository
+?
+https://github.com/etranzact-gh/jenkins-shared-libraries.git
+Credentials
+?
+
+etranzact-gh-cicd/****** (Contains our github creds that allows jenkins to login into our GitHub account to access our repositories.)
+Add
+Behaviors
+Discover branches
+?
+
+Delete
+Add
+
+Fresh clone per build
+?
+Library Path (optional)
+?
+./
+
+Delete
+Add
+Global Untrusted Pipeline Libraries
+Sharable libraries available to any Pipeline jobs running on this system. These libraries will be untrusted, meaning they run with “sandbox” restrictions and cannot use @Grab.
+Add
+Quality Gates - Sonarqube
+Add Sonar instance
+Build-timeout Plugin > BuildStep Action
+
+Enable BuildStep Action
+?
+Git plugin
+Global Config user.name Value
+?
+Global Config user.email Value
+?
+
+Create new accounts based on author/committer's email
+?
+
+Use existing account with same email if found
+?
+
+Show the entire commit summary in changes
+?
+
+Hide credential usage in job output
+?
+
+Disable performance enhancements
+?
+
+Preserve second fetch during checkout
+?
+
+Add git tag action to jobs
+?
+Groovy
+
+Allow token macro processing
+?
+Shell
+Shell executable
+?
+Extended E-mail Notification
+SMTP server
+SMTP Port
+25
+Advanced
+Default user e-mail suffix
+?
+Advanced
+Edited
+Default Content Type
+?
+
+Plain Text (text/plain)
+List ID
+?
+
+Add 'Precedence: bulk' E-mail Header
+?
+Default Recipients
+?
+Reply To List
+?
+Emergency reroute
+?
+Allowed Domains
+?
+Excluded Recipients
+?
+Default Subject
+?
+$PROJECT_NAME - Build # $BUILD_NUMBER - $BUILD_STATUS!
+Maximum Attachment Size
+?
+-1
+Default Content
+?
+$PROJECT_NAME - Build # $BUILD_NUMBER - $BUILD_STATUS:
+
+Check console output at $BUILD_URL to view the results.
+Default Pre-send Script
+?
+Default Post-send Script
+?
+Additional groovy classpath
+?
+Add
+
+Enable Throttling
+?
+
+Enable Debug Mode
+?
+
+Require Administrator for Template Testing
+?
+
+Enable watching for jobs
+?
+
+Allow sending to unregistered users
+?
+Default Triggers
+Content Token Reference
+?
+E-mail Notification
+SMTP server
+Default user e-mail suffix
+?
+Advanced
+Edited
+
+Test configuration by sending test e-mail
+Publish over SSH
+A configuration to use to connect to a SSH server
+Jenkins SSH Key
+?
+Passphrase
+?
+Concealed
+Change Password
+Path to key
+?
+Key
+?
+
+Disable exec
+?
+SSH Servers
+SSH Server
+Name
+?
+sandbox_server_aws
+Hostname
+?
+52.214.115.249
+Username
+?
+devops
+Remote Directory
+?
+/opt
+
+Avoid sending files that have not changed
+?
+Advanced
+Edited
+Test Configuration
+
+Delete
+SSH Server
+Name
+?
+server_cprod_aws
+Hostname
+?
+54.154.96.54
+Username
+?
+devops
+Remote Directory
+?
+/opt
+
+
+
