@@ -116,7 +116,7 @@ stage('Build Artifact') {
             if (fileExists('pom.xml')) {
                 echo "Java project detected — building with Maven..."
                 sh '''
-                    mvn clean package -DskipTests=true -Dquarkus.package.type=uber-jar
+                    mvn clean package -U -DskipTests=true -Dquarkus.package.type=uber-jar
                 '''
             } else if (fileExists('package.json')) {
                 echo "Node.js project detected — building production bundle..."
