@@ -1,4 +1,3 @@
-
 def call(Map config = [:]) {
 
 def PORTINGO = config.get('PORTINGO', '')
@@ -95,14 +94,14 @@ stage('Compile Source Code') {
     }
 
    //     // Quality Gates Inspection
-        // stage('Quality Gates Inspection') {
-        //     steps {
-        //         script{
-        //             waitForQualityGate abortPipeline: false
-        //         }
-        //     }
+       // stage('Quality Gates Inspection') {
+         //   steps {
+           //     script{
+             //       waitForQualityGate abortPipeline: false
+               // }
+            //}
 
-        // }
+        //}
 
 
         // Build Code Into Deployable Artifact
