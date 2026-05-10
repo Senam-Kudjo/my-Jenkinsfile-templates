@@ -30,8 +30,6 @@ metadata:
   labels:
     app: sandbox-app_name
 spec:
-  # securityContext:
-  #   runAsUser: 1010
   minReadySeconds: 15
   revisionHistoryLimit: 5
   selector:
